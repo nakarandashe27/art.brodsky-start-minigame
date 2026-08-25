@@ -33,14 +33,79 @@ AG.PlayScene = class extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, this.WORLD_W, this.WORLD_H);
     this.cameras.main.setDeadzone(120, 160);
 
-    // Первый тост — управление, без экрана управления и меню (vision)
-    AG.UI.toast(AG.CONTENT.toasts[0].id, AG.CONTENT.toasts[0].text);
-    AG.UI.anyKeyCloses();
-
     this.input.keyboard.on('keydown-ESC', () => {
-      if (this.assembling || this.finished) return;
+      if (this.assembling || this.finished || this.titleUp) return;
       AG.UI.togglePause((p) => (p ? this.physics.pause() : this.physics.resume()));
     });
+
+    this.showTitle();
+  }
+
+  // ---------------------------------------------------------- титульный экран
+  // Поверх живого мира, без затемнения. Он же первый экран для преподавателя:
+  // что это, сколько занимает и чему учит — видно, не запуская (риск S3).
+  showTitle() {
+    const W = this.scale.width, H = this.scale.height;
+    this.titleUp = true;
+    this.physics.pause();
+    this.hud.setVisible(false);
+    AG.UI.hideChip();
+
+    const c = this.add.container(0, 0).setScrollFactor(0).setDepth(300);
+    this.titleUi = c;
+
+    const logo = this.add.image(W / 2, Math.round(H * 0.30), 'logo');
+    c.add(logo);
+
+    const txt = (s, size, color, weight) => this.add.text(0, 0, s, {
+      fontFamily: 'Inter Tight, Arial, sans-serif',
+      fontSize: size + 'px', color, fontStyle: (weight || 600) + ' ' + size + 'px Inter Tight'
+    }).setLetterSpacing(1.6).setOrigin(0, 0.5);
+
+    // плашка: «СОБИРАЙ АРХИТЕКТУРНЫЕ ЭЛЕМЕНТЫ», среднее слово акцентом
+    const parts = [txt('СОБИРАЙ ', 14, '#ffffff'), txt('АРХИТЕКТУРНЫЕ', 14, '#f28d05'), txt(' ЭЛЕМЕНТЫ', 14, '#ffffff')];
+    const textW = parts.reduce((s, t) => s + t.width, 0);
+    const padX = 38, plaqueH = 36;
+    const plaqueW = textW + padX * 2;
+    const py = Math.round(logo.y + logo.height / 2 + 24);
+    const px0 = Math.round(W / 2 - plaqueW / 2);
+
+    const g = this.add.graphics();
+    g.fillStyle(0x262626, 1); g.fillRect(px0, py - plaqueH / 2, plaqueW, plaqueH);
+    g.lineStyle(2, 0x7a7a7a, 1); g.strokeRect(px0, py - plaqueH / 2, plaqueW, plaqueH);
+    g.fillStyle(0xf28d05, 1);                                  // квадратики-маркеры по краям
+    g.fillRect(px0 + 13, py - 3, 6, 6); g.fillRect(px0 + plaqueW - 19, py - 3, 6, 6);
+    c.add(g);
+
+    let tx = px0 + padX;
+    for (const t of parts) { t.setPosition(tx, py); tx += t.width; c.add(t); }
+
+    // машинная строка для преподавателя + подсказка старта
+    const meta = txt('[ 5–7 МИНУТ · ТРИ ТЕРМИНА · КЛАВИАТУРА ]', 11, '#5c5c5c', 400)
+      .setOrigin(0.5, 0.5).setPosition(W / 2, py + 30);
+    const hint = txt('НАЖМИ ЛЮБУЮ КЛАВИШУ', 13, '#262626')
+      .setOrigin(0.5, 0.5).setPosition(W / 2, py + 62);
+    c.add(meta); c.add(hint);
+    this.tweens.add({ targets: hint, alpha: 0.25, duration: 780, yoyo: true, repeat: -1 });
+
+    const start = () => this.hideTitle();
+    this.input.keyboard.once('keydown', start);
+    this.input.once('pointerdown', start);
+  }
+
+  hideTitle() {
+    if (!this.titleUp) return;
+    this.titleUp = false;
+    const c = this.titleUi;
+    this.titleUi = null;
+    this.tweens.add({
+      targets: c, alpha: 0, y: -18, duration: 320, ease: 'Cubic.easeIn',
+      onComplete: () => c.destroy(true)
+    });
+    this.physics.resume();
+    this.refreshHud();
+    AG.UI.toast(AG.CONTENT.toasts[0].id, AG.CONTENT.toasts[0].text);
+    AG.UI.anyKeyCloses();
   }
 
   // ---------------------------------------------------------------- уровень
@@ -555,6 +620,45 @@ AG.PlayScene = class extends Phaser.Scene {
     });
   }
 
+  // Подправка угла: если на подъёме игрок зацепил край платформы одним углом
+  // и вошёл в тайл на пару пикселей — сдвигаем вбок и возвращаем прыжок.
+  // Стандартный приём платформеров: убирает «съеденные» прыжки, не облегчая их.
+  cornerCorrect() {
+    const b = this.player.body;
+    if (!b.blocked.up || !(this._prevVy < 0)) return;
+    const T = this.T, tol = 10;
+    const top = b.top - 2;
+    const solid = (t) => !!t && t.collides;
+    const tl = this.groundLayer.getTileAtWorldXY(b.left + 2, top);
+    const tr = this.groundLayer.getTileAtWorldXY(b.right - 2, top);
+    let push = 0;
+    if (solid(tl) && !solid(tr)) push = (tl.pixelX + T) - b.left + 1;
+    else if (solid(tr) && !solid(tl)) push = -(b.right - tr.pixelX + 1);
+    if (push !== 0 && Math.abs(push) <= tol) {
+      this.player.x += push;
+      this.player.setVelocityY(Math.min(-220, this._prevVy * 0.8));
+    }
+  }
+
+  // Пыль под ногами: прыжок и жёсткое приземление. Пиксельные квадратики,
+  // без системы частиц — их тут ровно пять штук на событие.
+  puff(x, y, dir) {
+    for (let i = 0; i < 5; i++) {
+      const s = 4 + ((Math.random() * 3) | 0);
+      const r = this.add.rectangle(x + (Math.random() - 0.5) * 16, y - 2, s, s, 0xa9a9b4)
+        .setDepth(4).setAlpha(0.85);
+      this.tweens.add({
+        targets: r,
+        x: r.x + (Math.random() - 0.5) * 44 - dir * 14,
+        y: r.y - Math.random() * 16,
+        alpha: 0, scaleX: 0.25, scaleY: 0.25,
+        duration: 280 + Math.random() * 220,
+        ease: 'Cubic.easeOut',
+        onComplete: () => r.destroy()
+      });
+    }
+  }
+
   // --------------------------------------------------------------- update
   update(time, delta) {
     void delta;
@@ -566,6 +670,8 @@ AG.PlayScene = class extends Phaser.Scene {
     for (const l of this.cityLayers) l.night.tilePositionX = sx * l.factor;
     this.stars.tilePositionX = sx * 0.06;
     this.applyNight(this.nightTarget(this.player.x));
+
+    if (this.titleUp) return;   // мир живёт, игрок ждёт
 
     // зона для панели
     const z = this.currentZoneAt(this.player.x);
@@ -591,16 +697,26 @@ AG.PlayScene = class extends Phaser.Scene {
       this.player.setVelocityY(-640);
       this.jumpBufferedAt = -9999;
       this.tweens.add({ targets: this.player, scaleX: 0.84, scaleY: 1.14, duration: 90, yoyo: true });
+      this.puff(this.player.x, this.player.body.bottom, 0);
     }
     const upHeld = this.cursors.up.isDown || this.keys.SPACE.isDown || this.keys.W.isDown;
     if (!upHeld && this.player.body.velocity.y < -320) this.player.setVelocityY(-320);
 
-    // приземление — сплющивание
+    this.cornerCorrect();
+
+    // приземление — сплющивание и пыль
     if (onFloor && !this._wasFloor && this._fallSpeed > 420) {
       this.tweens.add({ targets: this.player, scaleX: 1.16, scaleY: 0.86, duration: 90, yoyo: true });
+      this.puff(this.player.x, this.player.body.bottom, 0);
     }
     this._wasFloor = onFloor;
+    this._prevVy = this._fallSpeed;
     this._fallSpeed = this.player.body.velocity.y;
+
+    // камера смотрит вперёд по ходу движения
+    const lead = Phaser.Math.Clamp(this.player.body.velocity.x * 0.30, -120, 120);
+    this._lead = Phaser.Math.Linear(this._lead || 0, lead, 0.05);
+    this.cameras.main.setFollowOffset(-this._lead, 0);
 
     // анимация персонажа: стойка / бег / прыжок
     const moving = Math.abs(this.player.body.velocity.x) > 30;
