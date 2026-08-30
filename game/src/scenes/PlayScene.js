@@ -33,6 +33,10 @@ AG.PlayScene = class extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, this.WORLD_W, this.WORLD_H);
     this.cameras.main.setDeadzone(120, 160);
 
+    this.input.keyboard.on('keydown-M', () => {
+      AG.UI.muteToast(AG.SFX.toggle());
+    });
+
     this.input.keyboard.on('keydown-ESC', () => {
       if (this.assembling || this.finished || this.titleUp) return;
       AG.UI.togglePause((p) => (p ? this.physics.pause() : this.physics.resume()));
@@ -81,7 +85,7 @@ AG.PlayScene = class extends Phaser.Scene {
     for (const t of parts) { t.setPosition(tx, py); tx += t.width; c.add(t); }
 
     // машинная строка для преподавателя + подсказка старта
-    const meta = txt('[ 5–7 МИНУТ · ТРИ ТЕРМИНА · КЛАВИАТУРА ]', 11, '#5c5c5c', 400)
+    const meta = txt('[ 5–7 МИНУТ · ТРИ ТЕРМИНА · КЛАВИАТУРА · M — ЗВУК ]', 11, '#5c5c5c', 400)
       .setOrigin(0.5, 0.5).setPosition(W / 2, py + 30);
     const hint = txt('НАЖМИ ЛЮБУЮ КЛАВИШУ', 13, '#262626')
       .setOrigin(0.5, 0.5).setPosition(W / 2, py + 62);
@@ -107,6 +111,8 @@ AG.PlayScene = class extends Phaser.Scene {
     AG.UI.toast(AG.CONTENT.toasts[0].id, AG.CONTENT.toasts[0].text);
     AG.UI.anyKeyCloses();
     AG.METRICS.goal('start');
+    AG.SFX.unlock();
+    AG.SFX.start();
   }
 
   // ---------------------------------------------------------------- уровень
@@ -376,6 +382,7 @@ AG.PlayScene = class extends Phaser.Scene {
   collect(p) {
     p.taken = true;
     this.collected[p.elIdx].push(p.pieceId);
+    AG.SFX.pickup();
     if (!this._gotFirst) { this._gotFirst = true; AG.METRICS.goal('frag_first'); }
     const el = AG.CONTENT.elements[p.elIdx];
 
@@ -537,6 +544,7 @@ AG.PlayScene = class extends Phaser.Scene {
       });
       this.selectedPiece = null;
       it.setScale(it.baseScale);
+      AG.SFX.deny();
       return;
     }
     // верное место
@@ -549,6 +557,7 @@ AG.PlayScene = class extends Phaser.Scene {
       duration: 200, ease: 'Cubic.easeOut',
       onComplete: () => item.destroy()
     });
+    AG.SFX.place();
     slot.setTexture('frag_' + el.id + '_' + pieceId + '_ink');
     slot.filled = true;
     slot.disableInteractive();
@@ -566,6 +575,7 @@ AG.PlayScene = class extends Phaser.Scene {
     const ui = this.asmUi;
     const el = AG.CONTENT.elements[elIdx];
     this.assembledZones.add(elIdx);
+    AG.SFX.assembled();
 
     // секунда тишины с готовым элементом
     this.time.delayedCall(250, () => {
@@ -702,6 +712,7 @@ AG.PlayScene = class extends Phaser.Scene {
       this.jumpBufferedAt = -9999;
       this.tweens.add({ targets: this.player, scaleX: 0.84, scaleY: 1.14, duration: 90, yoyo: true });
       this.puff(this.player.x, this.player.body.bottom, 0);
+      AG.SFX.jump();
     }
     const upHeld = this.cursors.up.isDown || this.keys.SPACE.isDown || this.keys.W.isDown;
     if (!upHeld && this.player.body.velocity.y < -320) this.player.setVelocityY(-320);
@@ -712,6 +723,7 @@ AG.PlayScene = class extends Phaser.Scene {
     if (onFloor && !this._wasFloor && this._fallSpeed > 420) {
       this.tweens.add({ targets: this.player, scaleX: 1.16, scaleY: 0.86, duration: 90, yoyo: true });
       this.puff(this.player.x, this.player.body.bottom, 0);
+      AG.SFX.land();
     }
     this._wasFloor = onFloor;
     this._prevVy = this._fallSpeed;

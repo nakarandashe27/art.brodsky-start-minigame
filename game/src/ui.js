@@ -101,6 +101,23 @@ AG.UI = (() => {
     return rec;
   }
 
+  // ---------- индикатор звука ----------
+  let muteEl = null, muteTimer = null;
+  function muteToast(isMuted) {
+    if (!muteEl) {
+      muteEl = document.createElement('div');
+      muteEl.style.cssText = 'position:absolute;top:20px;left:50%;transform:translateX(-50%);' +
+        'pointer-events:none;transition:opacity .25s var(--ease);opacity:0;';
+      root().appendChild(muteEl);
+    }
+    muteEl.innerHTML = '<span class="tag" style="background:var(--c-dark);color:var(--c-white);' +
+      'border-radius:var(--r-pill-sm);padding:8px 15px">звук :: ' +
+      (isMuted ? 'выкл' : 'вкл') + '</span>';
+    muteEl.style.opacity = '1';
+    clearTimeout(muteTimer);
+    muteTimer = setTimeout(() => { muteEl.style.opacity = '0'; }, 1100);
+  }
+
   // ---------- карточка термина ----------
   function termCard(el_, svgFull, onDone, zoneIdx) {
     const card = document.createElement('div');
@@ -151,6 +168,7 @@ AG.UI = (() => {
       '<dt>A / D или стрелки</dt><dd>идти</dd>' +
       '<dt>Пробел</dt><dd>прыжок</dd>' +
       '<dt>Esc</dt><dd>пауза</dd>' +
+      '<dt>M</dt><dd>звук вкл/выкл</dd>' +
       '</dl>' +
       '<button class="btn btn-blue">Продолжить</button>' +
       '</div>';
@@ -200,6 +218,7 @@ AG.UI = (() => {
           const correct = opt.id === target.id;
           results.push({ id: target.id, picked: opt.id, correct });
           AG.METRICS.goal('quiz_answer', { term: target.id, ok: correct ? 1 : 0 });
+          (correct ? AG.SFX.right : AG.SFX.wrong)();
           if (correct) {
             b.classList.add('is-right');
             setTimeout(askNext, 650);
@@ -244,6 +263,7 @@ AG.UI = (() => {
   function endScreen(elements, results) {
     const right = results.filter(r => r.correct).length;
     AG.METRICS.goal('finish', { right: right });
+    AG.SFX.finish();
     const wrap = document.createElement('div');
     wrap.className = 'end';
     wrap.innerHTML =
@@ -267,5 +287,6 @@ AG.UI = (() => {
     });
   }
 
-  return { mobileGate, toast, dismissToast, termCard, togglePause, quiz, endScreen, anyKeyCloses, setChip, hideChip };
+  return { mobileGate, toast, dismissToast, termCard, togglePause, quiz, endScreen,
+           anyKeyCloses, setChip, hideChip, muteToast };
 })();
