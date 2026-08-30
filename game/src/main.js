@@ -9,6 +9,7 @@ window.addEventListener('load', () => {
   if (coarse && noHover) {
     document.getElementById('app').style.display = 'none';
     AG.UI.mobileGate();
+    AG.METRICS.goal('gate_mobile');
     return;
   }
 

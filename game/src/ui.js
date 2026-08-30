@@ -118,10 +118,13 @@ AG.UI = (() => {
       '</div>';
     root().appendChild(card);
     requestAnimationFrame(() => card.classList.add('show'));
+    const opened = Date.now();
     let done = false;
     const finish = () => {
       if (done) return;
       done = true;
+      AG.METRICS.goal('term_read_' + (zoneIdx + 1),
+        { read: Math.round((Date.now() - opened) / 1000) });
       card.classList.remove('show');
       setTimeout(() => card.remove(), 350);
       onDone();
@@ -196,6 +199,7 @@ AG.UI = (() => {
         b.addEventListener('click', () => {
           const correct = opt.id === target.id;
           results.push({ id: target.id, picked: opt.id, correct });
+          AG.METRICS.goal('quiz_answer', { term: target.id, ok: correct ? 1 : 0 });
           if (correct) {
             b.classList.add('is-right');
             setTimeout(askNext, 650);
@@ -239,6 +243,7 @@ AG.UI = (() => {
   // ---------- финальный экран (тёмная секция) ----------
   function endScreen(elements, results) {
     const right = results.filter(r => r.correct).length;
+    AG.METRICS.goal('finish', { right: right });
     const wrap = document.createElement('div');
     wrap.className = 'end';
     wrap.innerHTML =
@@ -256,7 +261,10 @@ AG.UI = (() => {
       '</div>';
     root().appendChild(wrap);
     requestAnimationFrame(() => wrap.classList.add('show'));
-    wrap.querySelector('button').addEventListener('click', () => location.reload());
+    wrap.querySelector('button').addEventListener('click', () => {
+      AG.METRICS.goal('replay');
+      setTimeout(() => location.reload(), 150);
+    });
   }
 
   return { mobileGate, toast, dismissToast, termCard, togglePause, quiz, endScreen, anyKeyCloses, setChip, hideChip };

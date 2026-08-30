@@ -106,6 +106,7 @@ AG.PlayScene = class extends Phaser.Scene {
     this.refreshHud();
     AG.UI.toast(AG.CONTENT.toasts[0].id, AG.CONTENT.toasts[0].text);
     AG.UI.anyKeyCloses();
+    AG.METRICS.goal('start');
   }
 
   // ---------------------------------------------------------------- уровень
@@ -375,6 +376,7 @@ AG.PlayScene = class extends Phaser.Scene {
   collect(p) {
     p.taken = true;
     this.collected[p.elIdx].push(p.pieceId);
+    if (!this._gotFirst) { this._gotFirst = true; AG.METRICS.goal('frag_first'); }
     const el = AG.CONTENT.elements[p.elIdx];
 
     // полёт в панель: панель прибита к экрану, переводим её точку в мир
@@ -593,6 +595,8 @@ AG.PlayScene = class extends Phaser.Scene {
     this.physics.resume();
     this.hud.setVisible(true);
     this.refreshHud();
+
+    AG.METRICS.goal('zone_done_' + (elIdx + 1));
 
     // снять стену зоны
     const w = this.walls[elIdx];
