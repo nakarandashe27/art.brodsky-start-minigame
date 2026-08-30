@@ -12,7 +12,7 @@ window.AG = window.AG || {};
 
 AG.METRICS = (function () {
   // ← номер счётчика Яндекс.Метрики. null = аналитика выключена целиком.
-  const COUNTER = null;
+  const COUNTER = 112091538;
 
   // Свои прогоны не должны топить статистику при выборке в два десятка человек.
   const isLocal = location.protocol === 'file:' ||
