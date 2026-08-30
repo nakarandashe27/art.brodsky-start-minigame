@@ -92,6 +92,8 @@ AG.PlayScene = class extends Phaser.Scene {
     c.add(meta); c.add(hint);
     this.tweens.add({ targets: hint, alpha: 0.25, duration: 780, yoyo: true, repeat: -1 });
 
+    AG.UI.showLegal();
+
     const start = () => this.hideTitle();
     this.input.keyboard.once('keydown', start);
     this.input.once('pointerdown', start);
@@ -106,6 +108,7 @@ AG.PlayScene = class extends Phaser.Scene {
       targets: c, alpha: 0, y: -18, duration: 320, ease: 'Cubic.easeIn',
       onComplete: () => c.destroy(true)
     });
+    AG.UI.hideLegal();
     this.physics.resume();
     this.refreshHud();
     AG.UI.toast(AG.CONTENT.toasts[0].id, AG.CONTENT.toasts[0].text);

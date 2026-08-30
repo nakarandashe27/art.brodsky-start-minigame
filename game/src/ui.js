@@ -19,6 +19,36 @@ AG.UI = (() => {
 
   const stairs = (dark) => '<span class="stairs' + (dark ? ' on-dark' : '') + '"><i></i><i></i><i></i></span>';
 
+  // ---------- правовые документы школы ----------
+  const LEGAL = {
+    policy: 'https://disk.yandex.ru/d/lHjasPcdcpl3jg',
+    offer:  'https://disk.yandex.ru/i/aRbWWJK2A8EQig'
+  };
+
+  function legalLinks(onDark) {
+    const col = onDark ? 'rgba(255,255,255,.62)' : 'inherit';
+    const a = (href, text) => '<a href="' + href + '" target="_blank" rel="noopener noreferrer"' +
+      ' style="color:' + col + '">' + text + '</a>';
+    return a(LEGAL.policy, 'политика обработки данных') + ' · ' + a(LEGAL.offer, 'публичная оферта');
+  }
+
+  // Уведомление о сборе: показывается на титуле, до начала игры.
+  let legalEl = null;
+  function showLegal() {
+    if (!legalEl) {
+      legalEl = document.createElement('div');
+      legalEl.className = 'legal';
+      legalEl.innerHTML =
+        '<span class="tag">данные</span>' +
+        '<span>Игра использует Яндекс.Метрику: сохраняются файлы cookie и IP-адрес — ' +
+        'только для статистики посещений. Имя, телефон и почта не собираются.<br>' +
+        legalLinks(false) + '</span>';
+      root().appendChild(legalEl);
+    }
+    legalEl.style.opacity = '1';
+  }
+  function hideLegal() { if (legalEl) legalEl.style.opacity = '0'; }
+
   // машинный чип-счётчик фрагментов (левый верхний угол)
   function hudChip() {
     if (!chipEl) {
@@ -55,7 +85,10 @@ AG.UI = (() => {
       '<a id="mailLink" class="btn btn-ghost" href="mailto:?subject=' +
       encodeURIComponent('Ссылка на игру') + '&body=' +
       encodeURIComponent('Открой на компьютере: ') + '">Отправить себе письмом</a>' +
-      '</div></div>';
+      '</div>' +
+      '<p class="legal-mini" style="margin-top:18px;color:var(--on-dark-faint)">' +
+      legalLinks(true) + '</p>' +
+      '</div>';
     root().appendChild(el);
     el.querySelector('#copyLink').addEventListener('click', async () => {
       try {
@@ -278,6 +311,8 @@ AG.UI = (() => {
       '<p class="end-note">Узнано с первого раза: <b>' + right + ' из ' + results.length +
       '</b>. Три слова остались привязаны к трём формам.</p>' +
       '<button class="btn btn-ghost">Играть снова</button>' +
+      '<p class="legal-mini" style="margin-top:26px;color:var(--on-dark-faint)">' +
+      legalLinks(true) + '</p>' +
       '</div>';
     root().appendChild(wrap);
     requestAnimationFrame(() => wrap.classList.add('show'));
@@ -288,5 +323,5 @@ AG.UI = (() => {
   }
 
   return { mobileGate, toast, dismissToast, termCard, togglePause, quiz, endScreen,
-           anyKeyCloses, setChip, hideChip, muteToast };
+           anyKeyCloses, setChip, hideChip, muteToast, showLegal, hideLegal };
 })();
