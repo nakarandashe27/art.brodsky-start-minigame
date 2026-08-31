@@ -152,7 +152,8 @@ AG.UI = (() => {
   }
 
   // ---------- карточка термина ----------
-  function termCard(el_, svgFull, onDone, zoneIdx) {
+  // elIdx — индекс ЭЛЕМЕНТА (станции), не зоны: номер карточки в сеансе
+  function termCard(el_, svgFull, onDone, elIdx) {
     const card = document.createElement('div');
     card.className = 'termcard-wrap';
     // одно слово заголовка — акцентное
@@ -160,7 +161,8 @@ AG.UI = (() => {
     words[words.length - 1] = '<span class="accent">' + words[words.length - 1] + '</span>';
     card.innerHTML =
       '<div class="card termcard">' +
-      '<span class="tag">сборка :: 0' + (zoneIdx + 1) + '</span>' +
+      '<span class="tag">' + (AG.CONTENT.zones[AG.zoneOfElement(elIdx)] || { tag: 'термин' }).tag +
+      ' :: ' + (elIdx + 1 < 10 ? '0' : '') + (elIdx + 1) + '</span>' +
       '<div class="termcard-art">' + svgFull + '</div>' +
       '<h2 class="display">' + words.join(' ') + '</h2>' +
       '<p>' + el_.definition + '</p>' +
@@ -173,7 +175,7 @@ AG.UI = (() => {
     const finish = () => {
       if (done) return;
       done = true;
-      AG.METRICS.goal('term_read_' + (zoneIdx + 1),
+      AG.METRICS.goal('term_read_' + (elIdx + 1),
         { read: Math.round((Date.now() - opened) / 1000) });
       card.classList.remove('show');
       setTimeout(() => card.remove(), 350);
@@ -214,12 +216,16 @@ AG.UI = (() => {
 
   // ---------- викторина узнавания ----------
   // Вопрос называет термин, игрок выбирает форму (скоуп п.9)
-  function quiz(elements, onFinish, results) {
+  function quiz(allElements, onFinish, results) {
+    // Проверяются не все термины: узнавание силуэта имеет смысл там, где есть
+    // похожие дистракторы. Где их пришлось бы выдумывать — проверки нет.
+    const elements = allElements.filter(e => e.quiz);
     const wrap = document.createElement('div');
     wrap.className = 'quiz';
     root().appendChild(wrap);
     const state = { i: 0 };
     results = results || [];
+    const pad = (n) => (n < 10 ? '0' : '') + n;
 
     function askNext() {
       if (state.i >= elements.length) {
@@ -235,7 +241,7 @@ AG.UI = (() => {
 
       wrap.innerHTML =
         '<div class="card quiz-card">' +
-        '<div class="quiz-head"><span class="idx">0' + (state.i + 1) + ' / 03</span>' +
+        '<div class="quiz-head"><span class="idx">' + pad(state.i + 1) + ' / ' + pad(elements.length) + '</span>' +
         '<span class="tag" style="color:var(--on-light-dim)">проверка</span></div>' +
         '<h2 class="display">Какой из них — <span class="accent">' + term + '</span>?</h2>' +
         '<div class="quiz-opts"></div>' +
@@ -248,7 +254,8 @@ AG.UI = (() => {
         b.className = 'quiz-opt';
         b.innerHTML = AG.loopsToSvg(opt.loops, opt.w, opt.h, '#f7f7f7', '#262626', 3);
         b.addEventListener('click', () => {
-          const correct = opt.id === target.id;
+          const answer = target.quiz.answer || target.id;
+          const correct = opt.id === answer;
           results.push({ id: target.id, picked: opt.id, correct });
           AG.METRICS.goal('quiz_answer', { term: target.id, ok: correct ? 1 : 0 });
           (correct ? AG.SFX.right : AG.SFX.wrong)();
@@ -258,7 +265,7 @@ AG.UI = (() => {
           } else {
             b.classList.add('is-wrong');
             box.querySelectorAll('.quiz-opt').forEach(o => {
-              if (o.dataset.optid === target.id) o.classList.add('is-right');
+              if (o.dataset.optid === answer) o.classList.add('is-right');
               o.disabled = true;
             });
             setTimeout(askNext, 1400);
@@ -293,25 +300,36 @@ AG.UI = (() => {
   }
 
   // ---------- финальный экран (тёмная секция) ----------
+  // Формы сгруппированы по направлениям профессии: это и есть вывод сеанса —
+  // архитектура шире фасада, и семь форм пришли из пяти разных её областей.
   function endScreen(elements, results) {
     const right = results.filter(r => r.correct).length;
     AG.METRICS.goal('finish', { right: right });
     AG.SFX.finish();
+
+    const groups = AG.CONTENT.zones.map(z =>
+      '<div class="end-group">' +
+      '<span class="tag tag--ondark">' + z.tag + '</span>' +
+      '<div class="end-row">' +
+      z.els.map(i => {
+        const e = elements[i];
+        return '<figure>' +
+          AG.loopsToSvg(silhouetteOf(e.id).loops, e.view.w, e.view.h, '#ffffff', '#262626', 2) +
+          '<figcaption>' + (e.short || e.name) + '</figcaption></figure>';
+      }).join('') +
+      '</div></div>').join('');
+
     const wrap = document.createElement('div');
     wrap.className = 'end';
     wrap.innerHTML =
       '<div class="end-card">' +
       stairs(true) +
       '<h1 class="display">Готово<span class="accent">.</span></h1>' +
-      '<div class="end-row">' +
-      elements.map(e =>
-        '<figure>' + AG.loopsToSvg(silhouetteOf(e.id).loops, e.view.w, e.view.h, '#ffffff', '#262626', 2) +
-        '<figcaption>' + e.name + '</figcaption></figure>').join('') +
-      '</div>' +
+      '<div class="end-groups">' + groups + '</div>' +
       '<p class="end-note">Узнано с первого раза: <b>' + right + ' из ' + results.length +
-      '</b>. Три слова остались привязаны к трём формам.</p>' +
+      '</b>. Семь форм из пяти областей профессии — и ни одна из них не «просто дом».</p>' +
       '<button class="btn btn-ghost">Играть снова</button>' +
-      '<p class="legal-mini" style="margin-top:26px;color:var(--on-dark-faint)">' +
+      '<p class="legal-mini" style="margin-top:22px;color:var(--on-dark-faint)">' +
       legalLinks(true) + '</p>' +
       '</div>';
     root().appendChild(wrap);

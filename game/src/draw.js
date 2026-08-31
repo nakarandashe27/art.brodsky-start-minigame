@@ -38,10 +38,15 @@ AG.mixInt = function (a, b, t) {
 AG.DAY_SKY = [247, 247, 247];
 AG.NIGHT_SKY = [18, 21, 27];
 
-// Обвести и залить кольца точек [[x,y],...] с масштабом и сдвигом
+/* Обвести и залить кольца точек [[x,y],...] с масштабом и сдвигом.
+   beginPath — ОДИН раз на все кольца: каждое следующее открывается moveTo как
+   подпуть. Раньше beginPath стоял внутри цикла и обнулял путь, поэтому из
+   фигуры с несколькими кольцами на canvas рисовалось только последнее —
+   у скамьи оставалась одна ножка. В SVG (loopsToSvg) этой ошибки не было,
+   поэтому в проверке узнаванием фигуры выглядели целыми, а во фрагментах нет. */
 AG.traceLoops = function (ctx, loops, scale, ox, oy) {
+  ctx.beginPath();
   for (const loop of loops) {
-    ctx.beginPath();
     loop.forEach((p, i) => {
       const x = ox + p[0] * scale, y = oy + p[1] * scale;
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
