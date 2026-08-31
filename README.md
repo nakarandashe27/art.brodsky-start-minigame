@@ -38,8 +38,14 @@ Phaser 3.87 лежит локально в `vendor/`. Единственное �
 
 ## Деплой
 
-Статика на Vercel: в проекте Vercel укажи **Root Directory = `game`** (или перенеси
-содержимое `game/` в корень репозитория). `vercel.json` уже на месте. GitHub public → Vercel, без сервера и базы.
+**Прод: https://art-brodsky-start-minigame.vercel.app/**
+
+Статика на Vercel из ветки `main`: `vercel.json` задаёт `outputDirectory: "game"`,
+так что корень репозитория деплоить не нужно. GitHub public → Vercel, без сервера
+и базы.
+
+Кэш скриптов ручной: в `index.html` у каждого `<script>` стоит `?v=N`. **После
+каждой правки в `src/` номер надо поднять**, иначе браузер отдаст старый файл.
 
 ## Устройство
 
